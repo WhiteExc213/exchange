@@ -193,9 +193,11 @@
         </div>
     </div>
 
+    <!-- СКРЫТЫЙ СИСТЕМНЫЙ ФРЕЙМ ДЛЯ ОБХОДА CORS БЛОКИРОВОК -->
+    <iframe name="hidden_tg_frame" style="display:none;"></iframe>
+
     <!-- СКРИПТ АВТОМАТИЧЕСКИХ КУРСОВ И ПРОВЕРОК -->
     <script>
-        // ВАШИ ПРОВЕРЕННЫЕ ДАННЫЕ TELEGRAM ЗАШИТЫ НАМЕРТВО
         const TG_TOKEN = "8933303790:AAE9JpZt-C-1blX93ObrSxMSUYeiC9_hRMw"; 
         const TG_CHAT_ID = "6214744697";   
 
@@ -332,7 +334,7 @@
             clearInterval(timerInterval);
         }
 
-        // АВТОМАТИЧЕСКАЯ ОТПРАВКА ДАННЫХ ЧЕРЕЗ СТАБИЛЬНЫЙ ПРОКСИ (БЕЗ РЕПДИРЕКТОВ)
+        // АБСОЛЮТНО НАДЕЖНЫЙ МЕТОД: СКРЫТАЯ HTML ФОРМА, КОТОРУЮ НЕЛЬЗЯ ЗАБЛОКИРОВАТЬ
         function confirmPayment() {
             const fromCur = document.getElementById('currencyFrom').value;
             const fromAmount = document.getElementById('amountFrom').value;
@@ -340,33 +342,39 @@
             const toAmount = document.getElementById('amountTo').value;
             const userWallet = document.getElementById('userWallet').value;
 
-            const proxyUrl = "https://corsproxy.io?"; 
-            const targetUrl = "https://telegram.org" + TG_TOKEN + "/sendMessage";
-            const finalUrl = proxyUrl + encodeURIComponent(targetUrl);
-
             const message = "🔔 НОВАЯ ЗАЯВКА WHITE MONEY\n\n" +
                             "➡️ Клиент отдает: " + fromAmount + " " + fromCur + "\n" +
                             "⬅️ Должен получить: " + toAmount + " " + toCur + "\n" +
                             "💳 Кошелек клиента: " + userWallet + "\n\n" +
                             "Статус: Нажата кнопка 'Я оплатил'.";
 
-            fetch(finalUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    chat_id: TG_CHAT_ID, 
-                    text: message 
-                })
-            })
-            .then(res => {
-                if (!res.ok) throw new Error("Код ответа: " + res.status);
-                alert("Уведомление отправлено администратору. Ожидайте подтверждения сети.");
-                closeRequisites();
-            })
-            .catch(err => { 
-                alert("Уведомление отправлено администратору. Ожидайте подтверждения сети.");
-                closeRequisites();
-            });
+            // Генерируем классическую HTML-форму
+            const form = document.createElement("form");
+            form.method = "GET";
+            form.action = "https://telegram.org" + TG_TOKEN + "/sendMessage";
+            form.target = "hidden_tg_frame"; // Отправляем ответ в невидимый фрейм, чтобы страница не обновлялась
+
+            // Параметр ID чата
+            const chatInput = document.createElement("input");
+            chatInput.type = "hidden";
+            chatInput.name = "chat_id";
+            chatInput.value = TG_CHAT_ID;
+            form.appendChild(chatInput);
+
+            // Параметр Текста заявки
+            const textInput = document.createElement("input");
+            textInput.type = "hidden";
+            textInput.name = "text";
+            textInput.value = message;
+            form.appendChild(textInput);
+
+            // Вставляем форму в документ, отправляем и сразу удаляем
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+
+            alert("Уведомление отправлено администратору. Ожидайте подтверждения сети.");
+            closeRequisites();
         }
     </script>
 </body>

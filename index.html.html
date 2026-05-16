@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>White Money — Обменник</title>
+    
+    <!-- ПОДКЛЮЧЕНИЕ БИБЛИОТЕКИ ДЛЯ ГЕНЕРАЦИИ QR-КОДОВ -->
+    <script src="https://cloudflare.com"></script>
+
+    <style>
+        /* Базовые стили */
+        body {
+            background-color: #0b0c10;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0; padding: 0;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; overflow: hidden;
+        }
+
+        /* Карточка обмена */
+        .exchange-card {
+            background-color: #111116;
+            width: 100%; max-width: 440px;
+            padding: 35px 30px; border-radius: 12px;
+            box-shadow: 0 0 20px rgba(0, 242, 254, 0.6);
+            border: 1px solid rgba(0, 242, 254, 0.4);
+            box-sizing: border-box; text-align: center;
+            position: relative;
+        }
+
+        /* Контейнер Логотипа */
+        .logo-container {
+            display: flex; flex-direction: column; align-items: center; margin-bottom: 25px;
+        }
+        .logo-icon {
+            width: 70px; height: 70px; border: 2.5px solid #ffffff; border-radius: 50%;
+            position: relative; display: flex; justify-content: center; align-items: center;
+        }
+        .logo-icon::before {
+            content: "W"; color: #ffffff; font-size: 32px; font-weight: 900;
+            position: absolute; top: 8px; left: 12px; transform: skewX(-10deg);
+        }
+        .logo-icon::after {
+            content: "M"; color: #ffffff; font-size: 32px; font-weight: 900;
+            position: absolute; bottom: 6px; right: 10px; transform: skewX(-10deg);
+        }
+        .logo-line { position: absolute; width: 75px; height: 2.5px; background-color: #ffffff; transform: rotate(-55deg); }
+        .logo-text { color: #ffffff; font-size: 24px; font-weight: bold; margin-top: 12px; letter-spacing: 0.5px; }
+
+        /* Поля ввода формы */
+        .input-group { margin-bottom: 16px; text-align: left; }
+        .input-group label { display: block; color: #888888; font-size: 12px; margin-bottom: 6px; padding-left: 4px; }
+        .field-row { display: flex; gap: 10px; }
+        
+        .field-row select {
+            width: 30%; background-color: #1a1a24; border: 1px solid rgba(0, 242, 254, 0.5);
+            border-radius: 6px; padding: 12px; color: #ffffff; font-size: 14px; outline: none;
+            cursor: pointer; appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='10' height='6' viewBox='0 0 10 6'><path fill='%23ffffff' d='M0 0l5 5 5-5z'/></svg>");
+            background-repeat: no-repeat; background-position: right 12px center;
+        }
+        .field-row input, .full-input {
+            width: 70%; background-color: #1a1a24; border: 1px solid rgba(0, 242, 254, 0.5);
+            border-radius: 6px; padding: 12px 15px; color: #ffffff; font-size: 14px; outline: none; box-sizing: border-box;
+        }
+        .full-input { width: 100%; }
+
+        /* Текст ошибки лимита */
+        .error-message {
+            color: #ff3b30; font-size: 12px; text-align: left; margin-top: 5px;
+            padding-left: 4px; display: none; font-weight: 500;
+        }
+
+        .btn-submit, .btn-link-tg {
+            display: block; width: 100%; background: #00f2fe; border: none; border-radius: 6px; padding: 14px;
+            color: #000000; font-size: 16px; font-weight: bold; cursor: pointer; text-decoration: none;
+            margin-top: 10px; margin-bottom: 20px; transition: 0.3s; text-align: center; box-sizing: border-box;
+        }
+        .btn-submit:hover, .btn-link-tg:hover { background: #00d2dc; box-shadow: 0 0 15px rgba(0, 242, 254, 0.6); }
+        .footer-text { color: #555555; font-size: 11px; margin: 0; }
+
+        /* Окно Оплаты (Модалка) */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
+            z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        
+        .modal-content {
+            background-color: #111116; width: 100%; max-width: 440px;
+            padding: 30px 25px; border-radius: 12px; border: 1px solid rgba(0, 242, 254, 0.5);
+            box-shadow: 0 0 25px rgba(0, 242, 254, 0.4); box-sizing: border-box;
+            position: relative; text-align: left; max-height: 90vh; overflow-y: auto;
+        }
+        .modal-title { color: #00f2fe; font-size: 20px; margin: 0 0 15px 0; text-align: center; }
+
+        .requisite-item {
+            margin-bottom: 12px; background: #1a1a24; padding: 10px 12px; border-radius: 6px;
+            border: 1px solid #222232; position: relative;
+        }
+        .requisite-label { color: #888888; font-size: 11px; margin-bottom: 4px; text-transform: uppercase; }
+        .requisite-value { color: #ffffff; font-size: 13px; word-break: break-all; font-family: monospace; padding-right: 55px; }
+        .requisite-value.highlight { color: #00f2fe; font-weight: bold; font-size: 15px; }
+
+        .btn-copy {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            background: #222232; border: 1px solid #00f2fe; color: #00f2fe;
+            font-size: 11px; padding: 4px 8px; border-radius: 4px; cursor: pointer;
+        }
+        .btn-copy:hover { background: #00f2fe; color: #000000; }
+
+        /* Блок QR-кода */
+        .qr-container {
+            display: flex; justify-content: center; align-items: center;
+            margin: 20px 0; background: #ffffff; padding: 12px;
+            border-radius: 8px; width: 140px; height: 140px; margin-left: auto; margin-right: auto;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+        }
+
+        .timer-box { text-align: center; color: #ff3b30; font-size: 13px; margin-top: 10px; font-weight: bold; }
+        .close-modal { position: absolute; top: 15px; right: 15px; background: none; border: none; color: #555555; font-size: 22px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <!-- ФОРМА ОБМЕНА -->
+    <div class="exchange-card">
+        <div class="logo-container">
+            <div class="logo-icon"><div class="logo-line"></div></div>
+            <div class="logo-text">white money</div>
+        </div>
+        
+        <form onsubmit="openRequisites(event)">
+            <div class="input-group">
+                <label>Вы отдаете:</label>
+                <div class="field-row">
+                    <select id="currencyFrom" onchange="calculateExchange()">
+                        <option value="BTC">BTC</option>
+                        <option value="USDT">USDT</option>
+                        <option value="XMR">XMR</option>
+                    </select>
+                    <input type="number" id="amountFrom" step="any" placeholder="Сумма" oninput="calculateExchange()" required>
+                </div>
+                <div id="minAmountError" class="error-message">Минимальная сумма обмена составляет $2000 экв.</div>
+            </div>
+
+            <div class="input-group">
+                <label>Вы получаете:</label>
+                <div class="field-row">
+                    <select id="currencyTo" onchange="calculateExchange()">
+                        <option value="USDT">USDT</option>
+                        <option value="BTC">BTC</option>
+                        <option value="XMR">XMR</option>
+                    </select>
+                    <input type="number" id="amountTo" step="any" placeholder="Получите" oninput="calculateReverse()" required>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>Адрес вашего кошелька для получения:</label>
+                <input type="text" id="userWallet" class="full-input" placeholder="Введите адрес кошелька" required>
+            </div>
+
+            <button type="submit" class="btn-submit">Обменять</button>
+        </form>
+        <p class="footer-text">&copy; 2026 White Money. Все права защищены.</p>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО ОПЛАТЫ -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeRequisites()">&times;</button>
+            <h3 class="modal-title">Заявка создана</h3>
+            
+            <div class="requisite-item">
+                <div class="requisite-label">Сумма к переводу:</div>
+                <div class="requisite-value highlight" id="reqAmount">0.00 BTC</div>
+                <button class="btn-copy" onclick="copyText('reqAmount', false)">Копия</button>
+            </div>
+
+            <div class="requisite-item">
+                <div class="requisite-label">Адрес кошелька для оплаты:</div>
+                <div class="requisite-value" id="reqWallet">Кошелек</div>
+                <button class="btn-copy" onclick="copyText('reqWallet', true)">Копия</button>
+            </div>
+
+            <div class="qr-container" id="qrcode"></div>
+
+            <div class="timer-box" id="timer">Осталось времени: 15:00</div>
+            
+            <!-- ССЫЛОЧНАЯ КНОПКА, КОТОРУЮ НЕЛЬЗЯ ЗАБЛОКИРОВАТЬ -->
+            <a href="#" id="tgSubmitLink" class="btn-link-tg" target="_blank" onclick="closeRequisites()">Подтвердить оплату в Telegram</a>
+        </div>
+    </div>
+
+    <!-- СКРИПТ АВТОМАТИЧЕСКИХ КУРСОВ И ПРОВЕРОК -->
+    <script>
+        const BOT_USERNAME = "WhiteMoneyExchange_bot";
+        const MIN_USD_LIMIT = 2000;
+
+        let rates = { USDT: 1.00, BTC: 88200.00, XMR: 415.00 };
+
+        const projectWallets = {
+            BTC: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+            USDT: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+            XMR: "44AFFq5kSiGbG6TaSTG1KeUo9S3vU3F4vC"
+        };
+
+        let timerInterval;
+        let qrObject = null;
+
+        function updateRatesSilent() {
+            fetch('https://coingecko.com')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.bitcoin && data.monero) {
+                        rates.BTC = data.bitcoin.usd;
+                        rates.XMR = data.monero.usd;
+                        rates.USDT = data.tether.usd || 1.00;
+                        calculateExchange(); 
+                    }
+                })
+                .catch(err => console.log("Используются локальные курсы."));
+        }
+
+        function checkMinLimit() {
+            const from = document.getElementById('currencyFrom').value;
+            const amountFrom = parseFloat(document.getElementById('amountFrom').value);
+            const errorDiv = document.getElementById('minAmountError');
+
+            if (isNaN(amountFrom) || amountFrom <= 0) {
+                errorDiv.style.display = "none";
+                return true;
+            }
+
+            const amountInUSD = amountFrom * rates[from];
+            const minCryptoNeeded = (MIN_USD_LIMIT / rates[from]).toFixed(from === 'USDT' ? 2 : 5);
+
+            if (amountInUSD < MIN_USD_LIMIT) {
+                errorDiv.innerText = `Минимум для обмена: ${minCryptoNeeded} ${from} ($${MIN_USD_LIMIT})`;
+                errorDiv.style.display = "block";
+                return false;
+            } else {
+                errorDiv.style.display = "none";
+                return true;
+            }
+        }
+
+        function calculateExchange() {
+            const from = document.getElementById('currencyFrom').value;
+            const to = document.getElementById('currencyTo').value;
+            const amountFrom = parseFloat(document.getElementById('amountFrom').value);
+            
+            if (isNaN(amountFrom) || amountFrom <= 0) { document.getElementById('amountTo').value = ''; return; }
+            
+            const finalAmount = (amountFrom * rates[from]) / rates[to];
+            document.getElementById('amountTo').value = finalAmount.toFixed(to === 'USDT' ? 2 : 6);
+
+            checkMinLimit();
+            updateTelegramLink();
+        }
+
+        function calculateReverse() {
+            const from = document.getElementById('currencyFrom').value;
+            const to = document.getElementById('currencyTo').value;
+            const amountTo = parseFloat(document.getElementById('amountTo').value);
+            
+            if (isNaN(amountTo) || amountTo <= 0) { document.getElementById('amountFrom').value = ''; return; }
+            
+            const finalAmount = (amountTo * rates[to]) / rates[from];
+            document.getElementById('amountFrom').value = finalAmount.toFixed(from === 'USDT' ? 2 : 6);
+
+            checkMinLimit();
+            updateTelegramLink();
+        }
+
+        // ОБНОВЛЕНИЕ ССЫЛКИ ПРИ ЛЮБОМ ИЗМЕНЕНИИ ТЕКСТА
+        function updateTelegramLink() {
+            const fromCur = document.getElementById('currencyFrom').value;
+            const fromAmount = document.getElementById('amountFrom').value || "0";
+            const toCur = document.getElementById('currencyTo').value;
+            const toAmount = document.getElementById('amountTo').value || "0";
+            const userWallet = document.getElementById('userWallet').value || "Не указан";
+
+            const textMessage = "🔔 НОВАЯ ЗАЯВКА WHITE MONEY\n\n" +
+                                "➡️ Клиент отдает: " + fromAmount + " " + fromCur + "\n" +
+                                "⬅️ Должен получить: " + toAmount + " " + toCur + "\n" +
+                                "💳 Кошелек клиента: " + userWallet + "\n\n" +
+                                "Статус: Ожидание подтверждения оплаты.";
+
+            const webLink = "https://t.me" + BOT_USERNAME + "&text=" + encodeURIComponent(textMessage);
+            document.getElementById('tgSubmitLink').href = webLink;
+        }
+
+        document.getElementById('userWallet').addEventListener('input', updateTelegramLink);
+
+        updateRatesSilent();
+        setInterval(updateRatesSilent, 30000);
+
+        function copyText(elementId, clean) {
+            let text = document.getElementById(elementId).innerText;
+            if(!clean) text = text.split(' '); 
+            navigator.clipboard.writeText(text);
+            alert("Скопировано: " + text);
+        }
+
+        function openRequisites(event) {
+            event.preventDefault();
+            
+            if (!checkMinLimit()) {
+                alert(`Ошибка: Минимальная сумма сделки должна быть не менее $${MIN_USD_LIMIT} экв.`);
+                return;
+            }
+
+            updateTelegramLink(); // Генерируем финальный текст ссылки
+
+            const fromCur = document.getElementById('currencyFrom').value;
+            const AnnapolisAmount = document.getElementById('amountFrom').value;
+            const walletAddress = projectWallets[fromCur];
+
+            document.getElementById('reqAmount').innerText = `${AnnapolisAmount} ${fromCur}`;
+            document.getElementById('reqWallet').innerText = walletAddress;
+
+            document.getElementById('qrcode').innerHTML = "";
+
+            try {
+                qrObject = new QRCode(document.getElementById("qrcode"), {
+                    text: walletAddress,
+                    width: 140, height: 140,
+                    colorDark : "#000000", colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+            } catch(e) {}
+
+            document.getElementById('modalOverlay').classList.add('active');
+
+            let time = 15 * 60;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                let min = Math.floor(time / 60);
+                let sec = time % 60;
+                document.getElementById('timer').innerText = `Осталось времени: ${min}:${sec < 10 ? '0' : ''}${sec}`;
+                if (time-- <= 0) {
+                    clearInterval(timerInterval);
+                    alert("Время на оплату истекло!");
+                    closeRequisites();
+                }
+            }, 1000);
+        }
+
+        function closeRequisites() {
+            document.getElementById('modalOverlay').classList.remove('active');
+            clearInterval(timerInterval);
+        }
+    </script>
+</body>
+</html>
